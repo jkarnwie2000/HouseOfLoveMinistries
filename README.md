@@ -67,6 +67,7 @@ It also includes a **protected admin dashboard** for managing products, categori
 - **Events:** create, edit and delete events, and view registrations.
 - **Messages & Subscribers:** contact messages and newsletter subscribers, with CSV export.
 - **Staff accounts:** create users and enable or disable them.
+- **Staff sign-up with approval:** staff can request an account from **Staff Login → Create a staff account** (`/admin/register`). New accounts are *pending* and cannot sign in. The church office address and all admins are emailed; an admin chooses Editor or Admin and clicks **Approve** (or **Decline**) under *Staff Accounts*. The staff member is then emailed and can sign in and out.
 
 ---
 
@@ -270,7 +271,7 @@ Choose the database with `DB_DRIVER` in `.env`.
 | `donations` | id, reference, donorName, donorEmail, amount, frequency, fund, stripeSessionId, stripePaymentIntentId, stripeSubscriptionId, subscriptionStatus, paymentStatus, anonymous, createdAt |
 | `events` | id, title, description, startDate, endDate, recurrence, location, image, registrationRequired, capacity, published |
 | `registrations` | eventId, name, email, attendees |
-| `users` | email, name, role (`admin` or `editor`), passwordHash, active |
+| `users` | email, name, role (`admin` or `editor`), passwordHash, active, status (`pending` / `active`), note, requestedAt, approvedAt |
 | `messages`, `subscribers` | contact form messages and newsletter sign-ups |
 | `webhookEvents` | processed Stripe event ids (duplicate protection) |
 

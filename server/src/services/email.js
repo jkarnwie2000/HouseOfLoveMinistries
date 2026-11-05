@@ -194,3 +194,42 @@ export function fulfillmentEmail(order) {
     text: `${title}. Order ${order.orderNumber}.`,
   };
 }
+
+// ---- Staff accounts ----------------------------------------------------------
+export function staffRequestAlertEmail(user) {
+  const url = `${env.clientUrl}/admin/users`;
+  return {
+    subject: `Staff account request from ${user.name}`,
+    html: layout('New staff account request', `
+<p><strong>${e(user.name)}</strong> (${e(user.email)}) has asked for a staff account on the website.</p>
+${user.note ? `<p><strong>Role or ministry:</strong> ${e(user.note)}</p>` : ''}
+<p>The account cannot sign in until an administrator approves it. If you do not recognise this person, decline the request.</p>
+<p><a href="${e(url)}" style="color:#6B1E2E">Review the request on the Staff Accounts page</a></p>`),
+    text: `${user.name} <${user.email}> has asked for a staff account on the website.${user.note ? `\nRole or ministry: ${user.note}` : ''}\n\nThe account cannot sign in until an administrator approves it. If you do not recognise this person, decline the request.\n\nReview it here: ${url}`,
+    replyTo: user.email,
+  };
+}
+
+export function staffRequestReceivedEmail(user) {
+  return {
+    subject: 'Your staff account request was received',
+    html: layout('Account request received', `<p>Dear ${e(user.name)},</p>
+<p>Thank you for requesting a staff account for the House of Love International Ministries website. An administrator will review your request. You will receive another email when your account has been approved, and you can then sign in.</p>
+<p>If you did not make this request, you can ignore this email.</p>`),
+    text: `Dear ${user.name},\n\nThank you for requesting a staff account for the House of Love International Ministries website. An administrator will review your request. You will receive another email when your account has been approved, and you can then sign in.\n\nIf you did not make this request, you can ignore this email.`,
+  };
+}
+
+export function staffApprovedEmail(user) {
+  const url = `${env.clientUrl}/admin/login`;
+  const roleText = user.role === 'admin'
+    ? 'an administrator (full access, including donations and staff accounts)'
+    : 'an editor (products, categories, events, orders and messages)';
+  return {
+    subject: 'Your staff account has been approved',
+    html: layout('Your account is ready', `<p>Dear ${e(user.name)},</p>
+<p>Your staff account has been approved. You have been set up as ${e(roleText)}.</p>
+<p><a href="${e(url)}" style="color:#6B1E2E">Sign in here</a> with your email address and the password you chose. Remember to click <strong>Sign out</strong> when you have finished, especially on a shared computer.</p>`),
+    text: `Dear ${user.name},\n\nYour staff account has been approved. You have been set up as ${roleText}.\n\nSign in here with your email address and the password you chose: ${url}\n\nRemember to click Sign out when you have finished, especially on a shared computer.`,
+  };
+}

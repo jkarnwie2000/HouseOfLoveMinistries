@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db/index.js';
 import { verifyImageSignature, uploadFileName } from '../middleware/upload.js';
 import { cancelRecurringDonation } from '../services/donationService.js';
-import { fulfillmentEmail, sendEmail, sendTestEmail } from '../services/email.js';
+import { fulfillmentEmail, sendEmail, sendTestEmail, staffApprovedEmail } from '../services/email.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
 import { cleanText, slugify } from '../utils/sanitize.js';
 import { env } from '../config/env.js';
@@ -256,15 +256,43 @@ export async function listUsers(_req, res) {
 export async function createUser(req, res) {
   const { password, ...data } = req.validated;
   if ((await db().findBy('users', 'email', data.email)).length) throw conflict('A user with that email already exists.');
-  const user = await db().create('users', { ...data, active: true, passwordHash: await bcrypt.hash(password, 12) });
+  const user = await db().create('users', { ...data, active: true, status: 'active', passwordHash: await bcrypt.hash(password, 12) });
   res.status(201).json(safeUser(user));
 }
 
 export async function setUserActive(req, res) {
   if (req.params.id === req.user.id) throw badRequest('You cannot deactivate your own account.');
+  const current = await db().get('users', req.params.id);
+  if (!current) throw notFound('User not found.');
+  if (current.status === 'pending') throw badRequest('This account is waiting for approval. Use Approve or Decline instead.');
   const updated = await db().update('users', req.params.id, { active: Boolean(req.body?.active) });
   if (!updated) throw notFound('User not found.');
   res.json(safeUser(updated));
+}
+
+/** Approves a self-registered staff account, sets its role and emails the staff member. */
+export async function approveUser(req, res) {
+  const user = await db().get('users', req.params.id);
+  if (!user) throw notFound('User not found.');
+  if (user.status !== 'pending') throw badRequest('This account is not waiting for approval.');
+  const updated = await db().update('users', user.id, {
+    role: req.validated.role,
+    active: true,
+    status: 'active',
+    approvedAt: new Date().toISOString(),
+    approvedBy: req.user.email,
+  });
+  await sendEmail({ to: updated.email, ...staffApprovedEmail(updated) });
+  res.json(safeUser(updated));
+}
+
+/** Declines (deletes) a pending account request. Active accounts are disabled instead, never deleted here. */
+export async function declineUser(req, res) {
+  const user = await db().get('users', req.params.id);
+  if (!user) throw notFound('User not found.');
+  if (user.status !== 'pending') throw badRequest('Only pending account requests can be declined. Disable active accounts instead.');
+  await db().remove('users', user.id);
+  res.status(204).end();
 }
 
 // ---- Email diagnostics -----------------------------------------------------

@@ -33,6 +33,32 @@ function UsersInner() {
     }
   }
 
+  const pending = (data || []).filter((u) => u.status === 'pending');
+  const accounts = (data || []).filter((u) => u.status !== 'pending');
+  const [roles, setRoles] = useState({});
+
+  async function approve(u) {
+    const role = roles[u.id] || 'editor';
+    try {
+      await request(`/users/${u.id}/approve`, { method: 'POST', body: { role } });
+      notify(`${u.name} approved as ${role}. They have been emailed and can now sign in.`);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'error' });
+    }
+  }
+
+  async function decline(u) {
+    if (!window.confirm(`Decline the account request from ${u.name} (${u.email})? The request will be deleted.`)) return;
+    try {
+      await request(`/users/${u.id}`, { method: 'DELETE' });
+      notify(`Request from ${u.name} declined.`);
+      reload();
+    } catch (err) {
+      notify(err.message, { type: 'error' });
+    }
+  }
+
   async function toggle(u) {
     try {
       await request(`/users/${u.id}`, { method: 'PATCH', body: { active: !u.active } });
@@ -45,6 +71,40 @@ function UsersInner() {
   return (
     <>
       <div className="admin-header"><h1>Staff accounts</h1></div>
+      {pending.length > 0 && (
+        <section className="panel" aria-labelledby="pending-title">
+          <div className="panel-head">
+            <h2 id="pending-title">Waiting for approval <span className="badge badge-gold" style={{ fontSize: '0.9rem', verticalAlign: 'middle', marginLeft: '0.4rem' }}>{pending.length}</span></h2>
+          </div>
+          <div className="panel-body muted small" style={{ paddingBottom: 0 }}>
+            These people asked for a staff account from the sign-in page. Only approve people you recognise. Choose their role, then approve; they will be emailed and can then sign in.
+          </div>
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Name</th><th>Role or ministry</th><th>Requested</th><th>Give access as</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+              <tbody>
+                {pending.map((u) => (
+                  <tr key={u.id}>
+                    <td><strong>{u.name}</strong><br /><span className="small muted">{u.email}</span></td>
+                    <td>{u.note || <span className="muted">—</span>}</td>
+                    <td>{formatDateTime(u.requestedAt || u.createdAt)}</td>
+                    <td>
+                      <select className="select" aria-label={`Role for ${u.name}`} value={roles[u.id] || 'editor'} onChange={(e) => setRoles((r) => ({ ...r, [u.id]: e.target.value }))}>
+                        <option value="editor">Editor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button type="button" className="btn btn-sm" onClick={() => approve(u)}>Approve</button>{' '}
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => decline(u)}>Decline</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <div className="admin-cols">
         <div className="panel">
           {loading && <Loading />}
@@ -54,7 +114,7 @@ function UsersInner() {
               <table className="table">
                 <thead><tr><th>Name</th><th>Role</th><th>Last sign-in</th><th>Status</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
                 <tbody>
-                  {data.map((u) => (
+                  {accounts.map((u) => (
                     <tr key={u.id}>
                       <td><strong>{u.name}</strong><br /><span className="small muted">{u.email}</span></td>
                       <td><span className={`badge ${u.role === 'admin' ? 'badge-wine' : ''}`}>{u.role}</span></td>

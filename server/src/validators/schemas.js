@@ -148,6 +148,19 @@ export const fulfillmentSchema = z.object({
   internalNote: optionalText(1000),
 });
 
+/** Public "create a staff account" request – the account stays pending until an admin approves it. */
+export const registerSchema = z.object({
+  name: text(120, 2, 'Full name'),
+  email,
+  password: z.string().min(10, 'Use at least 10 characters.').max(200),
+  note: optionalText(300), // role or ministry, shown to the approving admin
+  website: optionalText(200), // honeypot – must stay empty
+});
+
+export const approveUserSchema = z.object({
+  role: z.enum(['admin', 'editor']),
+});
+
 export const userSchema = z.object({
   name: text(120, 2, 'Name'),
   email,

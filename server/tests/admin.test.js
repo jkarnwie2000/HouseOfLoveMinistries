@@ -148,3 +148,70 @@ describe('email delivery check', () => {
     await editor.post('/api/admin/email/test').send({ to: 'office@example.org' }).expect(403);
   });
 });
+
+describe('staff self-registration with admin approval', () => {
+  const applicant = { name: 'New Volunteer', email: 'volunteer@example.org', password: 'VolunteerPass123', note: 'Youth ministry' };
+
+  it('creates a pending account that cannot sign in yet', async () => {
+    const before = ctx.sentEmails.length;
+    const res = await request(ctx.app).post('/api/auth/register').send(applicant).expect(201);
+    assert.match(res.body.message, /approved/);
+    const [user] = await ctx.db().findBy('users', 'email', applicant.email);
+    assert.equal(user.status, 'pending');
+    assert.equal(user.active, false);
+    assert.equal(user.passwordHash.startsWith('$2'), true);
+    const mails = ctx.sentEmails.slice(before);
+    assert.ok(mails.some((m) => m.to === ADMIN.email && /Staff account request from New Volunteer/.test(m.subject)), 'admins are alerted');
+    assert.ok(mails.some((m) => m.to === applicant.email && /request was received/.test(m.subject)), 'applicant is acknowledged');
+
+    const blocked = await request(ctx.app).post('/api/auth/login').send({ email: applicant.email, password: applicant.password }).expect(403);
+    assert.match(blocked.body.error, /waiting for approval/);
+    await request(ctx.app).post('/api/auth/login').send({ email: applicant.email, password: 'wrong-password' }).expect(401);
+  });
+
+  it('validates the form and does not reveal existing accounts or accept bots', async () => {
+    const bad = await request(ctx.app).post('/api/auth/register').send({ name: 'X', email: 'nope', password: 'short' }).expect(400);
+    const fields = bad.body.details.map((d) => d.field);
+    for (const f of ['name', 'email', 'password']) assert.ok(fields.includes(f), f);
+    const count = (await ctx.db().list('users')).length;
+    await request(ctx.app).post('/api/auth/register').send({ ...applicant, name: 'Someone Else' }).expect(201);
+    await request(ctx.app).post('/api/auth/register').send({ name: 'Admin Clone', email: ADMIN.email, password: 'Whatever12345' }).expect(201);
+    await request(ctx.app).post('/api/auth/register').send({ ...applicant, email: 'bot@example.org', website: 'http://spam' }).expect(201);
+    assert.equal((await ctx.db().list('users')).length, count);
+  });
+
+  it('lets only admins approve, with the chosen role, and then the staff member can sign in and out', async () => {
+    await admin.post('/api/auth/login').send(ADMIN).expect(200);
+    const [pending] = await ctx.db().findBy('users', 'email', applicant.email);
+    await admin.patch(`/api/admin/users/${pending.id}`).send({ active: true }).expect(400);
+
+    const editor = request.agent(ctx.app);
+    await editor.post('/api/auth/login').send({ email: 'editor@example.org', password: 'EditorPass123' }).expect(200);
+    await editor.post(`/api/admin/users/${pending.id}/approve`).send({ role: 'admin' }).expect(403);
+
+    const before = ctx.sentEmails.length;
+    const approved = await admin.post(`/api/admin/users/${pending.id}/approve`).send({ role: 'editor' }).expect(200);
+    assert.equal(approved.body.role, 'editor');
+    assert.equal(approved.body.status, 'active');
+    assert.equal(approved.body.passwordHash, undefined);
+    assert.ok(ctx.sentEmails.slice(before).some((m) => m.to === applicant.email && /approved/.test(m.subject)));
+    await admin.post(`/api/admin/users/${pending.id}/approve`).send({ role: 'editor' }).expect(400);
+
+    const staff = request.agent(ctx.app);
+    await staff.post('/api/auth/login').send({ email: applicant.email, password: applicant.password }).expect(200);
+    await staff.get('/api/admin/products').expect(200);
+    await staff.get('/api/admin/donations').expect(403); // editors cannot see donations
+    await staff.post('/api/auth/logout').expect(200);
+    await staff.get('/api/admin/products').expect(401);
+  });
+
+  it('declines (removes) pending requests but never deletes active accounts', async () => {
+    await request(ctx.app).post('/api/auth/register').send({ name: 'Unknown Person', email: 'unknown@example.org', password: 'UnknownPass123' }).expect(201);
+    const [req1] = await ctx.db().findBy('users', 'email', 'unknown@example.org');
+    await admin.delete(`/api/admin/users/${req1.id}`).expect(204);
+    assert.equal(await ctx.db().get('users', req1.id), null);
+    await request(ctx.app).post('/api/auth/login').send({ email: 'unknown@example.org', password: 'UnknownPass123' }).expect(401);
+    const [active] = await ctx.db().findBy('users', 'email', applicant.email);
+    await admin.delete(`/api/admin/users/${active.id}`).expect(400);
+  });
+});

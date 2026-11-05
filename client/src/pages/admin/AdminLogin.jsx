@@ -8,6 +8,11 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { usePageMeta } from '../../lib/hooks.js';
 import '../../styles/admin.css';
 
+// Pages only administrators may open; anyone else goes to the Dashboard after signing in.
+const ADMIN_ONLY = ['/admin/users', '/admin/donations'];
+const destinationFor = (from, role) =>
+  !from || (role !== 'admin' && ADMIN_ONLY.some((p) => from.startsWith(p))) ? '/admin' : from;
+
 export default function AdminLogin() {
   usePageMeta('Staff Sign In');
   const { user, checking, login } = useAuth();
@@ -17,7 +22,7 @@ export default function AdminLogin() {
   const [status, setStatus] = useState({ state: 'idle', message: '' });
 
   if (checking) return <div className="login-page"><Loading /></div>;
-  if (user) return <Navigate to={location.state?.from || '/admin'} replace />;
+  if (user) return <Navigate to={destinationFor(location.state?.from, user.role)} replace />;
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -27,8 +32,8 @@ export default function AdminLogin() {
     }
     setStatus({ state: 'loading', message: '' });
     try {
-      await login(values.email, values.password);
-      navigate(location.state?.from || '/admin', { replace: true });
+      const signedIn = await login(values.email, values.password);
+      navigate(destinationFor(location.state?.from, signedIn.role), { replace: true });
     } catch (err) {
       setStatus({ state: 'error', message: err.message });
     }
@@ -48,6 +53,7 @@ export default function AdminLogin() {
             {status.state === 'loading' ? <Spinner /> : <Lock size={18} aria-hidden="true" />} Sign in
           </button>
         </form>
+        <p className="text-center small mt-3 mb-0">New staff member? <Link to="/admin/register">Create a staff account</Link></p>
         <p className="text-center small mt-3 mb-0"><Link to="/">← Back to website</Link></p>
       </main>
     </div>

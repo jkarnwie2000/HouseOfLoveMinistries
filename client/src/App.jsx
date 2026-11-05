@@ -20,6 +20,7 @@ import NotFound from './pages/NotFound.jsx';
 
 // The admin area is code-split so public visitors never download it.
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin.jsx'));
+const AdminRegister = lazy(() => import('./pages/admin/AdminRegister.jsx'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout.jsx'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard.jsx'));
 const AdminProducts = lazy(() => import('./pages/admin/Products.jsx'));
@@ -66,6 +67,7 @@ export default function App() {
 
       <Route path="admin" element={<AdminRoot />}>
         <Route path="login" element={<AdminLogin />} />
+        <Route path="register" element={<AdminRegister />} />
         <Route element={<AdminLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="products" element={<AdminProducts />} />

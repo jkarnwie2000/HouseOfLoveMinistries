@@ -3,7 +3,7 @@ import * as a from '../controllers/adminController.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { imageUpload } from '../middleware/upload.js';
 import { validate } from '../middleware/validate.js';
-import { categorySchema, eventSchema, fulfillmentSchema, productSchema, userSchema } from '../validators/schemas.js';
+import { approveUserSchema, categorySchema, eventSchema, fulfillmentSchema, productSchema, userSchema } from '../validators/schemas.js';
 
 const router = Router();
 const staff = requireRole('admin', 'editor');
@@ -46,6 +46,8 @@ router.get('/subscribers', staff, a.listSubscribers);
 router.get('/users', adminOnly, a.listUsers);
 router.post('/users', adminOnly, validate(userSchema), a.createUser);
 router.patch('/users/:id', adminOnly, a.setUserActive);
+router.post('/users/:id/approve', adminOnly, validate(approveUserSchema), a.approveUser);
+router.delete('/users/:id', adminOnly, a.declineUser);
 
 router.post('/email/test', adminOnly, a.testEmail);
 
