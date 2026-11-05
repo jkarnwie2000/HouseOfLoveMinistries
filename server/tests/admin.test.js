@@ -215,3 +215,57 @@ describe('staff self-registration with admin approval', () => {
     await admin.delete(`/api/admin/users/${active.id}`).expect(400);
   });
 });
+
+describe('resend receipt', () => {
+  const baseOrder = {
+    orderNumber: 'HOL-RESEND1', customerName: 'Mercy Buyer', customerEmail: 'mercy@example.org',
+    items: [{ productId: 'pocket-bible', name: 'Holy Bible – Pocket Edition', quantity: 1, unitPrice: 1600, lineTotal: 1600, color: 'Tan' }],
+    subtotal: 1600, shippingCost: 0, shippingLabel: 'Pick Up at Church', total: 1600, currency: 'usd', shippingAddress: null,
+  };
+
+  it('resends a paid order receipt to the customer or a corrected address, and records it', async () => {
+    await admin.post('/api/auth/login').send(ADMIN).expect(200);
+    const order = await ctx.db().create('orders', { ...baseOrder, paymentStatus: 'paid', emailSent: false });
+    const before = ctx.sentEmails.length;
+    const res = await admin.post(`/api/admin/orders/${order.id}/resend-receipt`).send({}).expect(200);
+    assert.equal(res.body.to, 'mercy@example.org');
+    const mail = ctx.sentEmails.at(-1);
+    assert.equal(ctx.sentEmails.length - before, 1);
+    assert.equal(mail.to, 'mercy@example.org');
+    assert.match(mail.subject, /^Order confirmed – HOL-RESEND1$/);
+
+    // Too soon → refused, nothing sent.
+    await admin.post(`/api/admin/orders/${order.id}/resend-receipt`).send({}).expect(400);
+    assert.equal(ctx.sentEmails.length - before, 1);
+
+    // After the wait, a corrected address works and both sends are recorded.
+    const saved = await ctx.db().get('orders', order.id);
+    await ctx.db().update('orders', order.id, { receiptResends: saved.receiptResends.map((r) => ({ ...r, at: '2020-01-01T00:00:00.000Z' })) });
+    await admin.post(`/api/admin/orders/${order.id}/resend-receipt`).send({ to: 'not-an-email' }).expect(400);
+    const corrected = await admin.post(`/api/admin/orders/${order.id}/resend-receipt`).send({ to: 'Mercy.Correct@Example.org' }).expect(200);
+    assert.equal(ctx.sentEmails.at(-1).to, 'mercy.correct@example.org');
+    assert.equal(corrected.body.receiptResends.length, 2);
+    assert.equal(corrected.body.receiptResends[1].by, ADMIN.email);
+    assert.equal((await ctx.db().get('orders', order.id)).emailSent, true);
+  });
+
+  it('refuses unpaid orders and lets only admins resend donation receipts', async () => {
+    const unpaid = await ctx.db().create('orders', { ...baseOrder, orderNumber: 'HOL-RESEND2', paymentStatus: 'pending' });
+    await admin.post(`/api/admin/orders/${unpaid.id}/resend-receipt`).send({}).expect(400);
+
+    const gift = await ctx.db().create('donations', {
+      reference: 'GIFT-RESEND', donorName: 'Joy Donor', donorEmail: 'joy@example.org', anonymous: false, amount: 3000,
+      currency: 'usd', frequency: 'one-time', fundLabel: 'General', paymentStatus: 'completed', completedAt: new Date().toISOString(),
+    });
+    const editor = request.agent(ctx.app);
+    await editor.post('/api/auth/login').send({ email: 'editor@example.org', password: 'EditorPass123' }).expect(200);
+    await editor.post(`/api/admin/donations/${gift.id}/resend-receipt`).send({}).expect(403);
+    const paid = await ctx.db().create('orders', { ...baseOrder, orderNumber: 'HOL-RESEND3', paymentStatus: 'paid' });
+    await editor.post(`/api/admin/orders/${paid.id}/resend-receipt`).send({}).expect(200);
+
+    await admin.post(`/api/admin/donations/${gift.id}/resend-receipt`).send({}).expect(200);
+    assert.equal(ctx.sentEmails.at(-1).to, 'joy@example.org');
+    assert.match(ctx.sentEmails.at(-1).subject, /^Donation receipt – GIFT-RESEND$/);
+    await request(ctx.app).post(`/api/admin/donations/${gift.id}/resend-receipt`).send({}).expect(401);
+  });
+});

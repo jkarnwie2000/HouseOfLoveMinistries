@@ -6,6 +6,7 @@ import { Alert, EmptyState, ErrorState, Loading, Spinner } from '../../component
 import { useAdminData, useAdminRequest } from '../../lib/adminApi.js';
 import { formatDateTime, money, titleCase } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import ResendReceipt from './ResendReceipt.jsx';
 
 const FULFILLMENT = ['unfulfilled', 'processing', 'shipped', 'ready_for_pickup', 'delivered', 'canceled'];
 const PAYMENT = ['paid', 'pending', 'review_required', 'failed', 'expired'];
@@ -177,10 +178,12 @@ export function OrderDetail() {
               <dl className="dl">
                 <dt>Placed</dt><dd>{formatDateTime(order.createdAt)}</dd>
                 {order.paidAt && (<><dt>Paid</dt><dd>{formatDateTime(order.paidAt)}</dd></>)}
+                {canFulfil && (<><dt>Receipt</dt><dd>{order.receiptResends?.length ? `Resent ${formatDateTime(order.receiptResends.at(-1).at)}` : order.emailSent ? 'Sent' : 'Not sent'}</dd></>)}
                 <dt>Session</dt><dd className="small">{order.stripeSessionId || '—'}</dd>
                 <dt>Payment ID</dt><dd className="small">{order.stripePaymentIntentId || '—'}</dd>
                 {order.lastPaymentError && (<><dt>Last error</dt><dd>{order.lastPaymentError}</dd></>)}
               </dl>
+              {canFulfil && <div className="mt-2"><ResendReceipt kind="order" record={order} onSent={reload} /></div>}
             </div>
           </section>
         </div>

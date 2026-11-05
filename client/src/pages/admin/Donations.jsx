@@ -7,6 +7,7 @@ import { formatDateTime, money, titleCase } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { Stat } from './Dashboard.jsx';
 import { PaymentBadge } from './Orders.jsx';
+import ResendReceipt from './ResendReceipt.jsx';
 
 function DonationsInner() {
   const [status, setStatus] = useState('completed');
@@ -76,9 +77,13 @@ function DonationsInner() {
                     <td><PaymentBadge status={d.paymentStatus} /></td>
                     <td className="num">{money(d.amount, d.currency)}</td>
                     <td>
-                      {d.stripeSubscriptionId && !d.isRenewal && ['active', 'past_due'].includes(d.subscriptionStatus) && (
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => cancel(d)}>Cancel monthly</button>
-                      )}
+                      <div className="flex gap-1" style={{ flexWrap: 'wrap' }}>
+                        {['completed', 'review_required'].includes(d.paymentStatus) && <ResendReceipt kind="donation" record={d} onSent={reload} compact />}
+                        {d.stripeSubscriptionId && !d.isRenewal && ['active', 'past_due'].includes(d.subscriptionStatus) && (
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => cancel(d)}>Cancel monthly</button>
+                        )}
+                      </div>
+                      {d.receiptResends?.length > 0 && <span className="small muted">Resent {formatDateTime(d.receiptResends.at(-1).at)}</span>}
                     </td>
                   </tr>
                 ))}

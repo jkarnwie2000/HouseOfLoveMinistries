@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db/index.js';
 import { verifyImageSignature, uploadFileName } from '../middleware/upload.js';
 import { cancelRecurringDonation } from '../services/donationService.js';
-import { fulfillmentEmail, sendEmail, sendTestEmail, staffApprovedEmail } from '../services/email.js';
+import { donationReceiptEmail, fulfillmentEmail, orderConfirmationEmail, sendEmail, sendTestEmail, staffApprovedEmail } from '../services/email.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
 import { cleanText, slugify } from '../utils/sanitize.js';
 import { env } from '../config/env.js';
@@ -293,6 +293,56 @@ export async function declineUser(req, res) {
   if (user.status !== 'pending') throw badRequest('Only pending account requests can be declined. Disable active accounts instead.');
   await db().remove('users', user.id);
   res.status(204).end();
+}
+
+// ---- Resend receipts ----------------------------------------------------------
+const RESEND_COOLDOWN_MS = 30 * 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Re-sends a receipt to the address on file, or to a corrected address typed by staff.
+ * Every resend is recorded (when, by whom, to where) on the order/donation.
+ */
+async function resendReceipt(req, res, { collection, record, onFile, sentField, buildEmail }) {
+  const to = cleanText(req.body?.to || '', 254).toLowerCase() || onFile;
+  if (!EMAIL_RE.test(to)) throw badRequest('Please enter a valid email address.');
+  const history = record.receiptResends || [];
+  const last = history.at(-1);
+  if (last && Date.now() - new Date(last.at).getTime() < RESEND_COOLDOWN_MS) {
+    throw badRequest('A receipt was just sent. Please wait 30 seconds before sending it again.');
+  }
+  const sent = await sendEmail({ to, replyTo: env.notifyEmail || undefined, ...buildEmail() });
+  if (!sent) {
+    const err = new Error('The email could not be sent. Use the “Email delivery check” on the Dashboard to see why.');
+    err.status = 502;
+    err.expose = true;
+    throw err;
+  }
+  const entry = { at: new Date().toISOString(), by: req.user.email, to };
+  const patch = { receiptResends: [...history, entry].slice(-20) };
+  if (to === onFile.toLowerCase()) patch[sentField] = true;
+  const updated = await db().update(collection, record.id, patch);
+  res.json({ ok: true, to, at: entry.at, receiptResends: updated.receiptResends });
+}
+
+export async function resendOrderReceipt(req, res) {
+  const order = await db().get('orders', req.params.id);
+  if (!order) throw notFound('Order not found.');
+  if (!['paid', 'review_required'].includes(order.paymentStatus)) throw badRequest('Only paid orders have a receipt to resend.');
+  return resendReceipt(req, res, {
+    collection: 'orders', record: order, onFile: order.customerEmail, sentField: 'emailSent',
+    buildEmail: () => orderConfirmationEmail(order),
+  });
+}
+
+export async function resendDonationReceipt(req, res) {
+  const donation = await db().get('donations', req.params.id);
+  if (!donation) throw notFound('Donation not found.');
+  if (!['completed', 'review_required'].includes(donation.paymentStatus)) throw badRequest('Only completed gifts have a receipt to resend.');
+  return resendReceipt(req, res, {
+    collection: 'donations', record: donation, onFile: donation.donorEmail, sentField: 'receiptSent',
+    buildEmail: () => donationReceiptEmail(donation, { renewal: Boolean(donation.isRenewal) }),
+  });
 }
 
 // ---- Email diagnostics -----------------------------------------------------

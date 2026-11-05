@@ -29,9 +29,11 @@ router.delete('/categories/:id', staff, a.deleteCategory);
 router.get('/orders', staff, a.listOrders);
 router.get('/orders/:id', staff, a.getOrder);
 router.patch('/orders/:id/fulfillment', staff, validate(fulfillmentSchema), a.updateFulfillment);
+router.post('/orders/:id/resend-receipt', staff, a.resendOrderReceipt);
 
 router.get('/donations', adminOnly, a.listDonations);
 router.post('/donations/:id/cancel-subscription', adminOnly, a.cancelSubscription);
+router.post('/donations/:id/resend-receipt', adminOnly, a.resendDonationReceipt);
 
 router.get('/events', staff, a.listEvents);
 router.post('/events', staff, validate(eventSchema), a.createEvent);
