@@ -47,4 +47,6 @@ router.get('/users', adminOnly, a.listUsers);
 router.post('/users', adminOnly, validate(userSchema), a.createUser);
 router.patch('/users/:id', adminOnly, a.setUserActive);
 
+router.post('/email/test', adminOnly, a.testEmail);
+
 export default router;

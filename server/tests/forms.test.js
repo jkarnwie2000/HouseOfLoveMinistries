@@ -59,3 +59,23 @@ describe('api hygiene', () => {
     assert.equal(res.headers['x-powered-by'], undefined);
   });
 });
+
+describe('email sender address', () => {
+  const fromFor = async (vars) => {
+    const { execFileSync } = await import('node:child_process');
+    return execFileSync(process.execPath, ['--input-type=module', '-e',
+      "const { env } = await import('./src/config/env.js'); process.stdout.write(env.emailFrom);"],
+    { env: { ...process.env, NODE_ENV: 'test', EMAIL_FROM: '', SMTP_USER: '', ...vars }, encoding: 'utf8' });
+  };
+
+  it('uses the SMTP account when EMAIL_FROM is still a placeholder', async () => {
+    assert.equal(await fromFor({ EMAIL_FROM: 'House of Love <no-reply@your-domain.org>', SMTP_USER: 'church@gmail.com' }),
+      'House of Love International Ministries <church@gmail.com>');
+    assert.equal(await fromFor({ SMTP_USER: 'church@gmail.com' }), 'House of Love International Ministries <church@gmail.com>');
+  });
+
+  it('keeps a real EMAIL_FROM unchanged', async () => {
+    assert.equal(await fromFor({ EMAIL_FROM: 'House of Love <office@houseoflove.org>', SMTP_USER: 'church@gmail.com' }),
+      'House of Love <office@houseoflove.org>');
+  });
+});

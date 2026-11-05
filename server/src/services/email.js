@@ -32,11 +32,41 @@ export async function sendEmail({ to, subject, html, text, replyTo }) {
     return false;
   }
   try {
-    await t.sendMail(message);
+    const info = await t.sendMail(message);
+    console.log(`[email] sent "${subject}" to ${maskEmail(to)} (${info.response || info.messageId})`);
     return true;
   } catch (err) {
-    console.error(`[email] failed to send "${subject}" to ${to}:`, err.message);
+    console.error(`[email] FAILED to send "${subject}" to ${maskEmail(to)}: ${err.message}`);
     return false;
+  }
+}
+
+export const maskEmail = (addr = '') => String(addr).replace(/^(.)[^@]*(@.*)$/, '$1***$2');
+
+/**
+ * Admin diagnostic: checks the SMTP login and sends a short test message.
+ * Returns the provider's exact error so problems can be fixed from the dashboard.
+ */
+export async function sendTestEmail(to) {
+  const t = getTransporter();
+  const from = env.emailFrom;
+  if (!t) return { ok: false, to, from, error: 'Email is not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS.' };
+  try {
+    await t.verify();
+  } catch (err) {
+    return { ok: false, to, from, error: `Could not sign in to the email server: ${err.message}` };
+  }
+  try {
+    const info = await t.sendMail({
+      from, to,
+      subject: 'Test email from the House of Love website',
+      text: 'This is a test email from your website. If you are reading it, receipts and confirmations can be delivered.',
+      html: layout('Email is working', '<p>This is a test email from your website. If you are reading it, receipts and order confirmations can be delivered.</p>'),
+    });
+    console.log(`[email] test email sent to ${maskEmail(to)} (${info.response || info.messageId})`);
+    return { ok: true, to, from, response: info.response || '' };
+  } catch (err) {
+    return { ok: false, to, from, error: `The email server refused the message: ${err.message}` };
   }
 }
 

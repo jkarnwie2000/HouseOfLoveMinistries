@@ -139,8 +139,8 @@ export async function markDonationCompleted(session) {
   });
 
   if (!updated.receiptSent) {
-    await sendEmail({ to: updated.donorEmail, ...donationReceiptEmail(updated) });
-    updated = await db().update('donations', donation.id, { receiptSent: true });
+    const sent = await sendEmail({ to: updated.donorEmail, ...donationReceiptEmail(updated) });
+    if (sent) updated = await db().update('donations', donation.id, { receiptSent: true });
   }
   return updated;
 }
@@ -192,8 +192,8 @@ export async function recordRecurringPayment(invoice) {
   const created = await db().createIfAbsent('donations', id, record);
   if (!created) return db().get('donations', id);
   await db().update('donations', root.id, { subscriptionStatus: 'active' });
-  await sendEmail({ to: record.donorEmail, ...donationReceiptEmail(record, { renewal: true }) });
-  return db().update('donations', id, { receiptSent: true });
+  const sent = await sendEmail({ to: record.donorEmail, ...donationReceiptEmail(record, { renewal: true }) });
+  return sent ? db().update('donations', id, { receiptSent: true }) : db().get('donations', id);
 }
 
 export async function updateSubscriptionStatus(subscriptionId, status) {

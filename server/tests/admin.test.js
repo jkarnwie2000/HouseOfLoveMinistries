@@ -135,3 +135,16 @@ describe('events, orders and roles', () => {
     await admin.get('/api/admin/stats').expect(401);
   });
 });
+
+describe('email delivery check', () => {
+  it('reports the problem to admins and is hidden from editors', async () => {
+    await admin.post('/api/auth/login').send(ADMIN).expect(200);
+    const res = await admin.post('/api/admin/email/test').send({ to: 'office@example.org' }).expect(200);
+    assert.equal(res.body.ok, false); // no SMTP server in tests
+    assert.match(res.body.error, /not configured/i);
+    await admin.post('/api/admin/email/test').send({ to: 'not-an-email' }).expect(400);
+    const editor = request.agent(ctx.app);
+    await editor.post('/api/auth/login').send({ email: 'editor@example.org', password: 'EditorPass123' }).expect(200);
+    await editor.post('/api/admin/email/test').send({ to: 'office@example.org' }).expect(403);
+  });
+});

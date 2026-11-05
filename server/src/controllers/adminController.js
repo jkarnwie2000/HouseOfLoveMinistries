@@ -4,9 +4,10 @@ import bcrypt from 'bcryptjs';
 import { db } from '../db/index.js';
 import { verifyImageSignature, uploadFileName } from '../middleware/upload.js';
 import { cancelRecurringDonation } from '../services/donationService.js';
-import { fulfillmentEmail, sendEmail } from '../services/email.js';
+import { fulfillmentEmail, sendEmail, sendTestEmail } from '../services/email.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
-import { slugify } from '../utils/sanitize.js';
+import { cleanText, slugify } from '../utils/sanitize.js';
+import { env } from '../config/env.js';
 
 const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
 const COMPLETED_ORDER = new Set(['paid', 'review_required']);
@@ -264,4 +265,11 @@ export async function setUserActive(req, res) {
   const updated = await db().update('users', req.params.id, { active: Boolean(req.body?.active) });
   if (!updated) throw notFound('User not found.');
   res.json(safeUser(updated));
+}
+
+// ---- Email diagnostics -----------------------------------------------------
+export async function testEmail(req, res) {
+  const to = cleanText(req.body?.to || '', 200) || env.notifyEmail || req.user.email;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw badRequest('Please enter a valid email address.');
+  res.json(await sendTestEmail(to));
 }

@@ -184,11 +184,11 @@ export async function markOrderPaid(session) {
 
   if (!updated.emailSent) {
     const mail = orderConfirmationEmail(updated);
-    await sendEmail({ to: updated.customerEmail, ...mail });
-    if (env.notifyEmail) {
+    const sent = await sendEmail({ to: updated.customerEmail, ...mail });
+    if (sent && env.notifyEmail) {
       await sendEmail({ to: env.notifyEmail, subject: `New store order ${updated.orderNumber}`, html: mail.html, text: mail.text });
     }
-    updated = await db().update('orders', order.id, { emailSent: true });
+    if (sent) updated = await db().update('orders', order.id, { emailSent: true });
   }
   return updated;
 }

@@ -29,6 +29,16 @@ if (!jwtSecret) {
   }
 }
 
+const smtpUser = process.env.SMTP_USER || '';
+// Mail providers such as Gmail only deliver reliably when the From address is the
+// account that signs in, so a placeholder EMAIL_FROM falls back to SMTP_USER.
+function resolveEmailFrom() {
+  const configured = (process.env.EMAIL_FROM || '').trim();
+  const isPlaceholder = !configured || /@(your-domain\.org|example\.(org|com))\b/i.test(configured);
+  if (isPlaceholder && smtpUser.includes('@')) return `House of Love International Ministries <${smtpUser}>`;
+  return configured || 'House of Love International Ministries <no-reply@example.org>';
+}
+
 export const env = {
   nodeEnv,
   isProd,
@@ -63,10 +73,10 @@ export const env = {
     host: process.env.SMTP_HOST || '',
     port: Number(process.env.SMTP_PORT) || 587,
     secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER || '',
+    user: smtpUser,
     pass: process.env.SMTP_PASS || '',
   },
-  emailFrom: process.env.EMAIL_FROM || 'House of Love International Ministries <no-reply@example.org>',
+  emailFrom: resolveEmailFrom(),
   notifyEmail: process.env.ORG_NOTIFY_EMAIL || '',
 
   uploadDir: process.env.UPLOAD_DIR
