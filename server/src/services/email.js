@@ -96,7 +96,62 @@ export function orderConfirmationEmail(order) {
 <tr><td><strong>Total paid</strong></td><td align="right"><strong>${formatMoney(order.total, order.currency)}</strong></td></tr></table>
 <p><strong>Delivery:</strong><br>${ship}</p>
 <p>We will email you again when your order ships. God bless you!</p>`);
-  return { subject: `Order confirmed – ${order.orderNumber}`, html, text: `Thank you for your order ${order.orderNumber}. Total paid: ${formatMoney(order.total, order.currency)}.` };
+  return {
+    subject: `Order confirmed – ${order.orderNumber}`,
+    html,
+    text: orderText(order, [
+      `Dear ${order.customerName},`,
+      '',
+      `We have received your payment for order ${order.orderNumber}. Your support helps us share God’s love with our community.`,
+    ], ['We will email you again when your order ships. God bless you!', '', 'House of Love International Ministries']),
+  };
+}
+
+/** Plain-text order summary (spam filters penalise HTML emails with a one-line text part). */
+function orderText(order, intro, outro) {
+  const money = (n) => formatMoney(n, order.currency);
+  const items = order.items.map((i) => `- ${i.name}${i.size ? ` · ${i.size}` : ''}${i.color ? ` · ${i.color}` : ''} × ${i.quantity}: ${money(i.lineTotal)}`);
+  const a = order.shippingAddress;
+  const delivery = a
+    ? [a.line1, a.line2, `${a.city}, ${a.state} ${a.postalCode}`, a.country].filter(Boolean).join('\n')
+    : 'Pick up at church';
+  return [
+    ...intro, '',
+    'Items:', ...items, '',
+    `Subtotal: ${money(order.subtotal)}`,
+    `Shipping (${order.shippingLabel}): ${money(order.shippingCost)}`,
+    `Total paid: ${money(order.total)}`, '',
+    'Delivery:', delivery, '',
+    ...outro,
+  ].join('\n');
+}
+
+/** Internal alert for the church office – deliberately different from the customer's confirmation. */
+export function newOrderAlertEmail(order) {
+  const money = (n) => formatMoney(n, order.currency);
+  const adminUrl = `${env.clientUrl}/admin/orders/${encodeURIComponent(order.id)}`;
+  const rows = order.items.map((i) => `<tr><td style="padding:4px 0">${e(i.name)}${i.size ? ` · ${e(i.size)}` : ''}${i.color ? ` · ${e(i.color)}` : ''} × ${i.quantity}</td><td align="right">${money(i.lineTotal)}</td></tr>`).join('');
+  const a = order.shippingAddress;
+  const ship = a ? `${e(a.line1)}${a.line2 ? `, ${e(a.line2)}` : ''}, ${e(a.city)}, ${e(a.state)} ${e(a.postalCode)}, ${e(a.country)}` : 'Pick up at church';
+  const html = layout(`New store order ${order.orderNumber}`, `
+<p style="background:#F3EBDB;padding:10px 14px;border-radius:8px;margin:0 0 16px"><strong>Staff notification.</strong> The customer has been sent their own confirmation at ${e(order.customerEmail)}.</p>
+<p><strong>Customer:</strong> ${e(order.customerName)}<br><strong>Email:</strong> ${e(order.customerEmail)}${order.customerPhone ? `<br><strong>Phone:</strong> ${e(order.customerPhone)}` : ''}</p>
+<table width="100%" style="border-collapse:collapse;border-top:1px solid #eee;margin:16px 0">${rows}
+<tr><td style="padding-top:8px;border-top:1px solid #eee"><strong>Total paid</strong></td><td align="right" style="border-top:1px solid #eee"><strong>${money(order.total)}</strong></td></tr></table>
+<p><strong>Delivery (${e(order.shippingLabel)}):</strong><br>${ship}</p>
+<p><a href="${e(adminUrl)}" style="color:#6B1E2E">Open this order in the admin dashboard</a> to update its fulfilment status.</p>`);
+  return {
+    subject: `New order ${order.orderNumber} – ${money(order.total)} from ${order.customerName}`,
+    html,
+    text: orderText(order, [
+      'STAFF NOTIFICATION – a new store order has been paid.',
+      `The customer has been sent their own confirmation at ${order.customerEmail}.`,
+      '',
+      `Order: ${order.orderNumber}`,
+      `Customer: ${order.customerName} <${order.customerEmail}>${order.customerPhone ? `, ${order.customerPhone}` : ''}`,
+    ], [`Open in the admin dashboard: ${adminUrl}`]),
+    replyTo: order.customerEmail,
+  };
 }
 
 export function donationReceiptEmail(donation, { renewal = false } = {}) {

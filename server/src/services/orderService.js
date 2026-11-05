@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 import { getShippingOption } from '../config/store.js';
 import { getStripe } from './stripe.js';
 import { priceCart } from './pricing.js';
-import { orderConfirmationEmail, sendEmail } from './email.js';
+import { newOrderAlertEmail, orderConfirmationEmail, sendEmail } from './email.js';
 import { notFound } from '../utils/errors.js';
 import { reference } from '../utils/sanitize.js';
 
@@ -39,6 +39,7 @@ export async function createMerchandiseCheckout({ items, shippingOption, custome
     stripePaymentIntentId: null,
     inventoryAdjusted: false,
     emailSent: false,
+    staffNotified: false,
   });
 
   const metadata = { type: 'merchandise', orderId: order.id, orderNumber: order.orderNumber };
@@ -182,13 +183,19 @@ export async function markOrderPaid(session) {
     updated = await db().update('orders', order.id, { inventoryAdjusted: true });
   }
 
+  // Customer confirmation → the email address entered at checkout.
   if (!updated.emailSent) {
-    const mail = orderConfirmationEmail(updated);
-    const sent = await sendEmail({ to: updated.customerEmail, ...mail });
-    if (sent && env.notifyEmail) {
-      await sendEmail({ to: env.notifyEmail, subject: `New store order ${updated.orderNumber}`, html: mail.html, text: mail.text });
-    }
+    const sent = await sendEmail({
+      to: updated.customerEmail,
+      replyTo: env.notifyEmail || undefined, // customer replies reach the church office
+      ...orderConfirmationEmail(updated),
+    });
     if (sent) updated = await db().update('orders', order.id, { emailSent: true });
+  }
+  // Separate staff alert → the church office address (tracked independently).
+  if (env.notifyEmail && !updated.staffNotified) {
+    const sent = await sendEmail({ to: env.notifyEmail, ...newOrderAlertEmail(updated) });
+    if (sent) updated = await db().update('orders', order.id, { staffNotified: true });
   }
   return updated;
 }

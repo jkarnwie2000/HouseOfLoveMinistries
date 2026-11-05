@@ -112,6 +112,37 @@ describe('stripe webhook', () => {
     assert.equal(lookup.body.paymentStatus, 'paid');
   });
 
+  it('sends the confirmation to the customer and a separate alert to the church office', async () => {
+    const { env } = await import('../src/config/env.js');
+    const previous = env.notifyEmail;
+    env.notifyEmail = 'office@church.example';
+    try {
+      const { created, order } = await startCheckout([{ productId: 'pocket-bible', quantity: 1, color: 'Tan' }], 'pickup');
+      const before = ctx.sentEmails.length;
+      await sendWebhook(stripeEvent('checkout.session.completed', {
+        id: created.id, object: 'checkout.session', mode: 'payment', payment_status: 'paid',
+        amount_total: order.total, currency: 'usd', payment_intent: 'pi_test_alert',
+        client_reference_id: order.id, metadata: created.params.metadata,
+      })).expect(200);
+      const sent = ctx.sentEmails.slice(before);
+      assert.equal(sent.length, 2);
+      const [toCustomer, toOffice] = sent;
+      assert.equal(toCustomer.to, customer.email);
+      assert.match(toCustomer.subject, /^Order confirmed/);
+      assert.equal(toCustomer.replyTo, 'office@church.example');
+      assert.match(toCustomer.text, /Pocket Edition/);
+      assert.equal(toOffice.to, 'office@church.example');
+      assert.match(toOffice.subject, /^New order .* from Grace Example/);
+      assert.match(toOffice.html, /Staff notification/);
+      assert.equal(toOffice.replyTo, customer.email);
+      const saved = await ctx.db().get('orders', order.id);
+      assert.equal(saved.emailSent, true);
+      assert.equal(saved.staffNotified, true);
+    } finally {
+      env.notifyEmail = previous;
+    }
+  });
+
   it('flags orders for review when the paid amount does not match', async () => {
     const { created, order } = await startCheckout([{ productId: 'pocket-bible', quantity: 1, color: 'Tan' }]);
     await sendWebhook(stripeEvent('checkout.session.completed', {
