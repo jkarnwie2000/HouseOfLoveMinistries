@@ -233,3 +233,42 @@ export function staffApprovedEmail(user) {
     text: `Dear ${user.name},\n\nYour staff account has been approved. You have been set up as ${roleText}.\n\nSign in here with your email address and the password you chose: ${url}\n\nRemember to click Sign out when you have finished, especially on a shared computer.`,
   };
 }
+
+/** Internal alert for the church office when a gift is completed. Respects the donor's anonymity choice. */
+export function donationAlertEmail(d, { renewal = false } = {}) {
+  const amount = formatMoney(d.amount, d.currency);
+  const kind = renewal ? 'Monthly gift renewal' : d.frequency === 'monthly' ? 'New monthly gift' : 'One-time gift';
+  const donor = d.anonymous ? 'Anonymous (the donor asked not to be named)' : `${d.donorName} <${d.donorEmail}>`;
+  const flagged = d.paymentStatus === 'review_required';
+  const url = `${env.clientUrl}/admin/donations`;
+  const html = layout(`${kind} received`, `
+<p style="background:#F3EBDB;padding:10px 14px;border-radius:8px;margin:0 0 16px"><strong>Staff notification.</strong> ${d.anonymous ? 'The donor' : e(d.donorName)} has been sent their own receipt.</p>
+${flagged ? '<p style="background:#fbe9e9;padding:10px 14px;border-radius:8px"><strong>Please review:</strong> the amount Stripe received did not match the amount on the form.</p>' : ''}
+<table width="100%" style="border-collapse:collapse">
+<tr><td style="padding:4px 0;width:40%"><strong>Amount</strong></td><td>${amount}${d.frequency === 'monthly' ? ' / month' : ''}</td></tr>
+<tr><td style="padding:4px 0"><strong>Type</strong></td><td>${e(kind)}</td></tr>
+<tr><td style="padding:4px 0"><strong>Designation</strong></td><td>${e(d.fundLabel || 'General ministry')}</td></tr>
+<tr><td style="padding:4px 0"><strong>Donor</strong></td><td>${e(donor)}</td></tr>
+<tr><td style="padding:4px 0"><strong>Reference</strong></td><td>${e(d.reference)}</td></tr>
+</table>
+${d.message ? `<p><strong>Message from the donor:</strong><br><span style="white-space:pre-wrap">${e(d.message)}</span></p>` : ''}
+<p><a href="${e(url)}" style="color:#6B1E2E">View donations in the admin dashboard</a></p>`);
+  const text = [
+    `STAFF NOTIFICATION – ${kind.toLowerCase()} received.`,
+    flagged ? 'PLEASE REVIEW: the amount Stripe received did not match the amount on the form.' : '',
+    '',
+    `Amount: ${amount}${d.frequency === 'monthly' ? ' / month' : ''}`,
+    `Designation: ${d.fundLabel || 'General ministry'}`,
+    `Donor: ${donor}`,
+    `Reference: ${d.reference}`,
+    d.message ? `\nMessage from the donor:\n${d.message}` : '',
+    '',
+    `View donations: ${url}`,
+  ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+  return {
+    subject: `${kind}: ${amount} – ${d.reference}${d.anonymous ? '' : ` from ${d.donorName}`}`,
+    html,
+    text,
+    ...(d.anonymous ? {} : { replyTo: d.donorEmail }),
+  };
+}

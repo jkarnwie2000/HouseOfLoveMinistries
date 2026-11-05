@@ -2,7 +2,7 @@ import { db } from '../db/index.js';
 import { env } from '../config/env.js';
 import { DONATION } from '../config/store.js';
 import { getStripe } from './stripe.js';
-import { donationReceiptEmail, sendEmail } from './email.js';
+import { donationAlertEmail, donationReceiptEmail, sendEmail } from './email.js';
 import { notFound } from '../utils/errors.js';
 import { reference } from '../utils/sanitize.js';
 
@@ -34,6 +34,7 @@ export async function createDonationCheckout(input) {
     subscriptionStatus: null,
     parentDonationId: null,
     receiptSent: false,
+    staffNotified: false,
   });
 
   const metadata = { type: 'donation', donationId: donation.id, reference: donation.reference, fund: fund.id };
@@ -124,7 +125,8 @@ export async function markDonationCompleted(session) {
     console.warn(`[donations] webhook for unknown donation ${donationId}`);
     return null;
   }
-  if (donation.paymentStatus === 'completed' || donation.paymentStatus === 'review_required') return donation;
+  // Already processed (e.g. a repeated webhook): only retry any email that has not gone out yet.
+  if (donation.paymentStatus === 'completed' || donation.paymentStatus === 'review_required') return sendDonationEmails(donation);
 
   const amountMatches = session.amount_total === donation.amount && session.currency === donation.currency;
   let updated = await db().update('donations', donation.id, {
@@ -138,9 +140,22 @@ export async function markDonationCompleted(session) {
     subscriptionStatus: donation.frequency === 'monthly' ? 'active' : null,
   });
 
+  return sendDonationEmails(updated);
+}
+
+/**
+ * Donor receipt → the email entered on the giving form.
+ * Staff alert → the church office (ORG_NOTIFY_EMAIL). Each is tracked separately so neither repeats.
+ */
+async function sendDonationEmails(donation, { renewal = false } = {}) {
+  let updated = donation;
   if (!updated.receiptSent) {
-    const sent = await sendEmail({ to: updated.donorEmail, ...donationReceiptEmail(updated) });
-    if (sent) updated = await db().update('donations', donation.id, { receiptSent: true });
+    const sent = await sendEmail({ to: updated.donorEmail, replyTo: env.notifyEmail || undefined, ...donationReceiptEmail(updated, { renewal }) });
+    if (sent) updated = await db().update('donations', updated.id, { receiptSent: true });
+  }
+  if (env.notifyEmail && !updated.staffNotified) {
+    const sent = await sendEmail({ to: env.notifyEmail, ...donationAlertEmail(updated, { renewal }) });
+    if (sent) updated = await db().update('donations', updated.id, { staffNotified: true });
   }
   return updated;
 }
@@ -188,12 +203,12 @@ export async function recordRecurringPayment(invoice) {
     parentDonationId: root.id,
     isRenewal: true,
     receiptSent: false,
+    staffNotified: false,
   };
   const created = await db().createIfAbsent('donations', id, record);
   if (!created) return db().get('donations', id);
   await db().update('donations', root.id, { subscriptionStatus: 'active' });
-  const sent = await sendEmail({ to: record.donorEmail, ...donationReceiptEmail(record, { renewal: true }) });
-  return sent ? db().update('donations', id, { receiptSent: true }) : db().get('donations', id);
+  return sendDonationEmails({ ...record, id }, { renewal: true });
 }
 
 export async function updateSubscriptionStatus(subscriptionId, status) {

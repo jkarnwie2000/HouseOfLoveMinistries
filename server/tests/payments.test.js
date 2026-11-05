@@ -221,6 +221,44 @@ describe('donations', () => {
     assert.ok(lookup.body.reference.startsWith('GIFT-'));
   });
 
+  it('emails the donor a receipt and the church office a separate alert (hiding anonymous donors)', async () => {
+    const { env } = await import('../src/config/env.js');
+    const previous = env.notifyEmail;
+    env.notifyEmail = 'office@church.example';
+    const give = async (body) => {
+      await request(ctx.app).post('/api/donations/session').send(body).expect(201);
+      const created = ctx.fakeStripe.created.at(-1);
+      const before = ctx.sentEmails.length;
+      const event = stripeEvent('checkout.session.completed', {
+        id: created.id, mode: 'payment', payment_status: 'paid', amount_total: body.amount * 100, currency: 'usd',
+        payment_intent: `pi_${created.id}`, metadata: created.params.metadata,
+      });
+      await sendWebhook(event).expect(200);
+      await sendWebhook({ ...event, id: `${event.id}_again` }).expect(200); // repeated delivery sends nothing new
+      return ctx.sentEmails.slice(before);
+    };
+    try {
+      const named = await give({ amount: 40, frequency: 'one-time', name: 'Hope Giver', email: 'hope@example.org', fund: 'general', message: 'For the youth trip' });
+      assert.equal(named.length, 2);
+      const [receipt, alert] = named;
+      assert.equal(receipt.to, 'hope@example.org');
+      assert.match(receipt.subject, /^Donation receipt/);
+      assert.equal(alert.to, 'office@church.example');
+      assert.match(alert.subject, /^One-time gift: \$40\.00 – GIFT-.* from Hope Giver$/);
+      assert.match(alert.text, /For the youth trip/);
+      assert.equal(alert.replyTo, 'hope@example.org');
+
+      const anon = await give({ amount: 15, frequency: 'one-time', anonymous: true, email: 'quiet@example.org', fund: 'general' });
+      const anonAlert = anon.find((m) => m.to === 'office@church.example');
+      assert.ok(anon.some((m) => m.to === 'quiet@example.org'), 'anonymous donors still get their receipt');
+      assert.doesNotMatch(anonAlert.subject + anonAlert.html + anonAlert.text, /quiet@example\.org/);
+      assert.match(anonAlert.text, /Anonymous/);
+      assert.equal(anonAlert.replyTo, undefined);
+    } finally {
+      env.notifyEmail = previous;
+    }
+  });
+
   it('supports anonymous gifts', async () => {
     await request(ctx.app).post('/api/donations/session')
       .send({ amount: 10, frequency: 'one-time', anonymous: true, email: 'anon@example.org' }).expect(201);
