@@ -1,0 +1,41 @@
+{
+  "name": "house-of-love-server",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "node --watch-path=src src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1 tests/",
+    "seed": "node scripts/seed.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
+  "license": "UNLICENSED",
+  "description": "API for House of Love International Ministries: store, Stripe checkout, donations and admin.",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.3",
+    "firebase-admin": "^13.10.0",
+    "helmet": "^8.3.0",
+    "house-of-love-international-ministries": "file:..",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.5.0",
+    "nodemailer": "^10.3.1",
+    "stripe": "^23.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.19"
+  }
+}

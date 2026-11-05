@@ -1,0 +1,24 @@
+{
+  "name": "house-of-love-client",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "license": "UNLICENSED",
+  "description": "React frontend for House of Love International Ministries",
+  "dependencies": {
+    "house-of-love-international-ministries": "file:..",
+    "lucide-react": "^1.68.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.2.1",
+    "vite": "^8.3.5"
+  },
+  "private": true,
+  "type": "module"
+}

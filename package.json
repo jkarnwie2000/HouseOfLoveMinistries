@@ -1,0 +1,23 @@
+{
+  "name": "house-of-love-international-ministries",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Website, online store and donation platform for House of Love International Ministries",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently -k -n api,web -c magenta,yellow \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "npm start --prefix server",
+    "test": "npm test --prefix server",
+    "seed": "npm run seed --prefix server",
+    "create-admin": "npm run create-admin --prefix server",
+    "stripe:listen": "stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,payment_intent.payment_failed,invoice.paid,invoice.payment_failed,customer.subscription.updated,customer.subscription.deleted --forward-to localhost:4242/api/webhooks/stripe"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
+}
