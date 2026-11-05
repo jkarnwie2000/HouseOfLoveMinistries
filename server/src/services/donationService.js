@@ -2,7 +2,7 @@ import { db } from '../db/index.js';
 import { env } from '../config/env.js';
 import { DONATION } from '../config/store.js';
 import { getStripe } from './stripe.js';
-import { donationAlertEmail, donationReceiptEmail, sendEmail } from './email.js';
+import { donationReceiptEmail, donationReceiptStaffCopy, sendEmail } from './email.js';
 import { notFound } from '../utils/errors.js';
 import { reference } from '../utils/sanitize.js';
 
@@ -145,7 +145,7 @@ export async function markDonationCompleted(session) {
 
 /**
  * Donor receipt → the email entered on the giving form.
- * Staff alert → the church office (ORG_NOTIFY_EMAIL). Each is tracked separately so neither repeats.
+ * Copy of the same receipt → the church office (ORG_NOTIFY_EMAIL). Each is tracked separately so neither repeats.
  */
 async function sendDonationEmails(donation, { renewal = false } = {}) {
   let updated = donation;
@@ -154,7 +154,7 @@ async function sendDonationEmails(donation, { renewal = false } = {}) {
     if (sent) updated = await db().update('donations', updated.id, { receiptSent: true });
   }
   if (env.notifyEmail && !updated.staffNotified) {
-    const sent = await sendEmail({ to: env.notifyEmail, ...donationAlertEmail(updated, { renewal }) });
+    const sent = await sendEmail({ to: env.notifyEmail, ...donationReceiptStaffCopy(updated, { renewal }) });
     if (sent) updated = await db().update('donations', updated.id, { staffNotified: true });
   }
   return updated;

@@ -126,34 +126,6 @@ function orderText(order, intro, outro) {
   ].join('\n');
 }
 
-/** Internal alert for the church office – deliberately different from the customer's confirmation. */
-export function newOrderAlertEmail(order) {
-  const money = (n) => formatMoney(n, order.currency);
-  const adminUrl = `${env.clientUrl}/admin/orders/${encodeURIComponent(order.id)}`;
-  const rows = order.items.map((i) => `<tr><td style="padding:4px 0">${e(i.name)}${i.size ? ` · ${e(i.size)}` : ''}${i.color ? ` · ${e(i.color)}` : ''} × ${i.quantity}</td><td align="right">${money(i.lineTotal)}</td></tr>`).join('');
-  const a = order.shippingAddress;
-  const ship = a ? `${e(a.line1)}${a.line2 ? `, ${e(a.line2)}` : ''}, ${e(a.city)}, ${e(a.state)} ${e(a.postalCode)}, ${e(a.country)}` : 'Pick up at church';
-  const html = layout(`New store order ${order.orderNumber}`, `
-<p style="background:#F3EBDB;padding:10px 14px;border-radius:8px;margin:0 0 16px"><strong>Staff notification.</strong> The customer has been sent their own confirmation at ${e(order.customerEmail)}.</p>
-<p><strong>Customer:</strong> ${e(order.customerName)}<br><strong>Email:</strong> ${e(order.customerEmail)}${order.customerPhone ? `<br><strong>Phone:</strong> ${e(order.customerPhone)}` : ''}</p>
-<table width="100%" style="border-collapse:collapse;border-top:1px solid #eee;margin:16px 0">${rows}
-<tr><td style="padding-top:8px;border-top:1px solid #eee"><strong>Total paid</strong></td><td align="right" style="border-top:1px solid #eee"><strong>${money(order.total)}</strong></td></tr></table>
-<p><strong>Delivery (${e(order.shippingLabel)}):</strong><br>${ship}</p>
-<p><a href="${e(adminUrl)}" style="color:#6B1E2E">Open this order in the admin dashboard</a> to update its fulfilment status.</p>`);
-  return {
-    subject: `New order ${order.orderNumber} – ${money(order.total)} from ${order.customerName}`,
-    html,
-    text: orderText(order, [
-      'STAFF NOTIFICATION – a new store order has been paid.',
-      `The customer has been sent their own confirmation at ${order.customerEmail}.`,
-      '',
-      `Order: ${order.orderNumber}`,
-      `Customer: ${order.customerName} <${order.customerEmail}>${order.customerPhone ? `, ${order.customerPhone}` : ''}`,
-    ], [`Open in the admin dashboard: ${adminUrl}`]),
-    replyTo: order.customerEmail,
-  };
-}
-
 export function donationReceiptEmail(donation, { renewal = false } = {}) {
   const amount = formatMoney(donation.amount, donation.currency);
   const html = layout(renewal ? 'Thank you for your monthly gift' : 'Thank you for your generous gift', `
@@ -164,7 +136,21 @@ export function donationReceiptEmail(donation, { renewal = false } = {}) {
 ${donation.frequency === 'monthly' ? '<p>Your gift will repeat monthly. To change or cancel your monthly gift at any time, simply reply to this email or contact the church office.</p>' : ''}
 <p>Your generosity strengthens our worship, outreach, missions and care for families. “Each of you should give what you have decided in your heart to give… for God loves a cheerful giver.” (2 Corinthians 9:7)</p>
 <p style="font-size:12px;color:#6b625b">Please keep this email for your records. House of Love International Ministries does not provide tax advice; please consult the church office and your tax adviser about the tax treatment of your gift.</p>`);
-  return { subject: `Donation receipt – ${donation.reference}`, html, text: `Thank you for your donation of ${amount}. Reference: ${donation.reference}.` };
+  const text = [
+    `Dear ${donation.anonymous ? 'Friend' : donation.donorName},`,
+    '',
+    `We gratefully confirm your ${donation.frequency === 'monthly' ? 'monthly ' : ''}donation of ${amount} to House of Love International Ministries.`,
+    '',
+    `Reference: ${donation.reference}`,
+    `Date: ${new Date(donation.completedAt || donation.createdAt).toLocaleDateString('en-US', { dateStyle: 'long' })}`,
+    `Designation: ${donation.fundLabel || 'General ministry'}`,
+    ...(donation.frequency === 'monthly' ? ['', 'Your gift will repeat monthly. To change or cancel your monthly gift at any time, simply reply to this email or contact the church office.'] : []),
+    '',
+    'Your generosity strengthens our worship, outreach, missions and care for families.',
+    '',
+    'Please keep this email for your records. House of Love International Ministries does not provide tax advice; please consult the church office and your tax adviser about the tax treatment of your gift.',
+  ].join('\n');
+  return { subject: `Donation receipt – ${donation.reference}`, html, text };
 }
 
 export function contactNotificationEmail(msg) {
@@ -234,41 +220,47 @@ export function staffApprovedEmail(user) {
   };
 }
 
-/** Internal alert for the church office when a gift is completed. Respects the donor's anonymity choice. */
-export function donationAlertEmail(d, { renewal = false } = {}) {
-  const amount = formatMoney(d.amount, d.currency);
-  const kind = renewal ? 'Monthly gift renewal' : d.frequency === 'monthly' ? 'New monthly gift' : 'One-time gift';
-  const donor = d.anonymous ? 'Anonymous (the donor asked not to be named)' : `${d.donorName} <${d.donorEmail}>`;
-  const flagged = d.paymentStatus === 'review_required';
-  const url = `${env.clientUrl}/admin/donations`;
-  const html = layout(`${kind} received`, `
-<p style="background:#F3EBDB;padding:10px 14px;border-radius:8px;margin:0 0 16px"><strong>Staff notification.</strong> ${d.anonymous ? 'The donor' : e(d.donorName)} has been sent their own receipt.</p>
-${flagged ? '<p style="background:#fbe9e9;padding:10px 14px;border-radius:8px"><strong>Please review:</strong> the amount Stripe received did not match the amount on the form.</p>' : ''}
-<table width="100%" style="border-collapse:collapse">
-<tr><td style="padding:4px 0;width:40%"><strong>Amount</strong></td><td>${amount}${d.frequency === 'monthly' ? ' / month' : ''}</td></tr>
-<tr><td style="padding:4px 0"><strong>Type</strong></td><td>${e(kind)}</td></tr>
-<tr><td style="padding:4px 0"><strong>Designation</strong></td><td>${e(d.fundLabel || 'General ministry')}</td></tr>
-<tr><td style="padding:4px 0"><strong>Donor</strong></td><td>${e(donor)}</td></tr>
-<tr><td style="padding:4px 0"><strong>Reference</strong></td><td>${e(d.reference)}</td></tr>
-</table>
-${d.message ? `<p><strong>Message from the donor:</strong><br><span style="white-space:pre-wrap">${e(d.message)}</span></p>` : ''}
-<p><a href="${e(url)}" style="color:#6B1E2E">View donations in the admin dashboard</a></p>`);
-  const text = [
-    `STAFF NOTIFICATION – ${kind.toLowerCase()} received.`,
-    flagged ? 'PLEASE REVIEW: the amount Stripe received did not match the amount on the form.' : '',
-    '',
-    `Amount: ${amount}${d.frequency === 'monthly' ? ' / month' : ''}`,
-    `Designation: ${d.fundLabel || 'General ministry'}`,
-    `Donor: ${donor}`,
-    `Reference: ${d.reference}`,
-    d.message ? `\nMessage from the donor:\n${d.message}` : '',
-    '',
-    `View donations: ${url}`,
-  ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+// ---- Staff copies of receipts ------------------------------------------------
+/**
+ * Turns a customer/donor receipt into the church office's copy: the identical receipt,
+ * with a clearly marked "Staff copy" box at the top so it is never mistaken for misdirected mail.
+ */
+function staffCopy(receipt, { lines, links = [], replyTo }) {
+  const box = `<div style="background:#F3EBDB;border-left:4px solid #C9A24B;padding:12px 16px;border-radius:8px;margin:0 0 20px;font-size:14px">
+<strong>Staff copy</strong> – this is a copy of the receipt below.<br>${lines.map(e).join('<br>')}
+${links.map(([href, label]) => `<br><a href="${e(href)}" style="color:#6B1E2E">${e(label)}</a>`).join('')}</div>`;
+  const cut = receipt.html.indexOf('</h1>') + '</h1>'.length;
   return {
-    subject: `${kind}: ${amount} – ${d.reference}${d.anonymous ? '' : ` from ${d.donorName}`}`,
-    html,
-    text,
-    ...(d.anonymous ? {} : { replyTo: d.donorEmail }),
+    subject: `Copy: ${receipt.subject}`,
+    html: receipt.html.slice(0, cut) + box + receipt.html.slice(cut),
+    text: ['STAFF COPY – this is a copy of the receipt below.', ...lines, ...links.map(([href, label]) => `${label}: ${href}`), '', '------------------------------', '', receipt.text].join('\n'),
+    ...(replyTo ? { replyTo } : {}),
   };
+}
+
+/** The church office's copy of a customer's order confirmation. */
+export function orderReceiptStaffCopy(order) {
+  return staffCopy(orderConfirmationEmail(order), {
+    lines: [
+      `Sent to the customer: ${order.customerName} <${order.customerEmail}>${order.customerPhone ? `, ${order.customerPhone}` : ''}`,
+      `Order ${order.orderNumber} – ${formatMoney(order.total, order.currency)} paid${order.shippingAddress ? '' : ' – pick up at church'}`,
+    ],
+    links: [[`${env.clientUrl}/admin/orders/${encodeURIComponent(order.id)}`, 'Open this order in the admin dashboard']],
+    replyTo: order.customerEmail,
+  });
+}
+
+/** The church office's copy of a donor's receipt. Anonymous donors' contact details are left out. */
+export function donationReceiptStaffCopy(d, { renewal = false } = {}) {
+  const kind = renewal ? 'Monthly gift renewal' : d.frequency === 'monthly' ? 'New monthly gift' : 'One-time gift';
+  return staffCopy(donationReceiptEmail(d, { renewal }), {
+    lines: [
+      d.anonymous ? 'Sent to the donor, who asked to give anonymously (name and email withheld).' : `Sent to the donor: ${d.donorName} <${d.donorEmail}>`,
+      `${kind}: ${formatMoney(d.amount, d.currency)}${d.frequency === 'monthly' ? ' / month' : ''} – ${d.fundLabel || 'General ministry'}`,
+      ...(d.paymentStatus === 'review_required' ? ['PLEASE REVIEW: the amount Stripe received did not match the amount on the form.'] : []),
+      ...(d.message ? [`Message from the donor: ${d.message}`] : []),
+    ],
+    links: [[`${env.clientUrl}/admin/donations`, 'View donations in the admin dashboard']],
+    replyTo: d.anonymous ? undefined : d.donorEmail,
+  });
 }

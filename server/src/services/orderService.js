@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 import { getShippingOption } from '../config/store.js';
 import { getStripe } from './stripe.js';
 import { priceCart } from './pricing.js';
-import { newOrderAlertEmail, orderConfirmationEmail, sendEmail } from './email.js';
+import { orderConfirmationEmail, orderReceiptStaffCopy, sendEmail } from './email.js';
 import { notFound } from '../utils/errors.js';
 import { reference } from '../utils/sanitize.js';
 
@@ -192,9 +192,9 @@ export async function markOrderPaid(session) {
     });
     if (sent) updated = await db().update('orders', order.id, { emailSent: true });
   }
-  // Separate staff alert → the church office address (tracked independently).
+  // Copy of the same receipt → the church office address (tracked independently).
   if (env.notifyEmail && !updated.staffNotified) {
-    const sent = await sendEmail({ to: env.notifyEmail, ...newOrderAlertEmail(updated) });
+    const sent = await sendEmail({ to: env.notifyEmail, ...orderReceiptStaffCopy(updated) });
     if (sent) updated = await db().update('orders', order.id, { staffNotified: true });
   }
   return updated;

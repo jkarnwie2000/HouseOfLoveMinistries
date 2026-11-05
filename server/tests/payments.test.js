@@ -112,7 +112,7 @@ describe('stripe webhook', () => {
     assert.equal(lookup.body.paymentStatus, 'paid');
   });
 
-  it('sends the confirmation to the customer and a separate alert to the church office', async () => {
+  it('sends the receipt to the customer and a staff copy of it to the church office', async () => {
     const { env } = await import('../src/config/env.js');
     const previous = env.notifyEmail;
     env.notifyEmail = 'office@church.example';
@@ -132,8 +132,10 @@ describe('stripe webhook', () => {
       assert.equal(toCustomer.replyTo, 'office@church.example');
       assert.match(toCustomer.text, /Pocket Edition/);
       assert.equal(toOffice.to, 'office@church.example');
-      assert.match(toOffice.subject, /^New order .* from Grace Example/);
-      assert.match(toOffice.html, /Staff notification/);
+      assert.equal(toOffice.subject, `Copy: ${toCustomer.subject}`);
+      assert.match(toOffice.html, /Staff copy/);
+      assert.match(toOffice.html, /grace@example\.org/);
+      assert.ok(toOffice.text.endsWith(toCustomer.text), 'office gets the full customer receipt');
       assert.equal(toOffice.replyTo, customer.email);
       const saved = await ctx.db().get('orders', order.id);
       assert.equal(saved.emailSent, true);
@@ -221,7 +223,7 @@ describe('donations', () => {
     assert.ok(lookup.body.reference.startsWith('GIFT-'));
   });
 
-  it('emails the donor a receipt and the church office a separate alert (hiding anonymous donors)', async () => {
+  it('emails the receipt to the donor and a staff copy to the church office (hiding anonymous donors)', async () => {
     const { env } = await import('../src/config/env.js');
     const previous = env.notifyEmail;
     env.notifyEmail = 'office@church.example';
@@ -244,15 +246,19 @@ describe('donations', () => {
       assert.equal(receipt.to, 'hope@example.org');
       assert.match(receipt.subject, /^Donation receipt/);
       assert.equal(alert.to, 'office@church.example');
-      assert.match(alert.subject, /^One-time gift: \$40\.00 – GIFT-.* from Hope Giver$/);
+      assert.equal(alert.subject, `Copy: ${receipt.subject}`);
+      assert.match(receipt.subject, /^Donation receipt – GIFT-/);
+      assert.ok(alert.text.endsWith(receipt.text), 'office gets the full donor receipt');
+      assert.match(alert.text, /Hope Giver <hope@example\.org>/);
       assert.match(alert.text, /For the youth trip/);
+      assert.match(alert.text, /\$40\.00/);
       assert.equal(alert.replyTo, 'hope@example.org');
 
       const anon = await give({ amount: 15, frequency: 'one-time', anonymous: true, email: 'quiet@example.org', fund: 'general' });
       const anonAlert = anon.find((m) => m.to === 'office@church.example');
       assert.ok(anon.some((m) => m.to === 'quiet@example.org'), 'anonymous donors still get their receipt');
       assert.doesNotMatch(anonAlert.subject + anonAlert.html + anonAlert.text, /quiet@example\.org/);
-      assert.match(anonAlert.text, /Anonymous/);
+      assert.match(anonAlert.text, /anonymously/);
       assert.equal(anonAlert.replyTo, undefined);
     } finally {
       env.notifyEmail = previous;
