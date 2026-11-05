@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index.js';
-import { verifyImageSignature } from '../middleware/upload.js';
+import { verifyImageSignature, uploadFileName } from '../middleware/upload.js';
 import { cancelRecurringDonation } from '../services/donationService.js';
 import { fulfillmentEmail, sendEmail } from '../services/email.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
@@ -101,6 +101,16 @@ export async function deleteProduct(req, res) {
 
 export async function uploadImage(req, res) {
   if (!req.file) throw badRequest('Please choose an image to upload.');
+  if (req.file.buffer) {
+    // Vercel Blob storage (production on Vercel).
+    if (!verifyImageSignature(req.file.buffer)) throw badRequest('That file does not appear to be a valid image.');
+    const { put } = await import('@vercel/blob');
+    const blob = await put(`products/${uploadFileName(req.file.mimetype)}`, req.file.buffer, {
+      access: 'public',
+      contentType: req.file.mimetype,
+    });
+    return res.status(201).json({ url: blob.url });
+  }
   if (!verifyImageSignature(req.file.path)) {
     fs.rmSync(req.file.path, { force: true });
     throw badRequest('That file does not appear to be a valid image.');

@@ -56,7 +56,8 @@ export function createApp() {
   app.use('/api/admin', adminRoutes);
   app.use('/api', notFoundHandler);
 
-  fs.mkdirSync(env.uploadDir, { recursive: true });
+  // Locally uploaded images (on Vercel, images live in Vercel Blob instead).
+  try { fs.mkdirSync(env.uploadDir, { recursive: true }); } catch { /* read-only filesystem */ }
   app.use('/uploads', express.static(env.uploadDir, { maxAge: '30d', index: false, dotfiles: 'deny' }));
 
   // In production the API also serves the built React app.

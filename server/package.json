@@ -15,6 +15,7 @@
   "license": "UNLICENSED",
   "description": "API for House of Love International Ministries: store, Stripe checkout, donations and admin.",
   "dependencies": {
+    "@vercel/blob": "^2.8.2",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -23,7 +24,6 @@
     "express-rate-limit": "^8.7.3",
     "firebase-admin": "^13.10.0",
     "helmet": "^8.3.0",
-    "house-of-love-international-ministries": "file:..",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
     "nodemailer": "^10.3.1",

@@ -19,7 +19,9 @@ export async function createFirestoreStore(config) {
     });
   }
   const fs = getFirestore();
-  fs.settings({ ignoreUndefinedProperties: true });
+  try {
+    fs.settings({ ignoreUndefinedProperties: true });
+  } catch { /* already configured earlier in this process */ }
 
   const now = () => new Date().toISOString();
   const snap = (s) => (s.exists ? { id: s.id, ...s.data() } : null);
