@@ -359,6 +359,21 @@ In production the Express server serves `client/dist` and handles all routes, so
 - `STRIPE_WEBHOOK_SECRET`
 - the database variables, SMTP variables, and `ADMIN_EMAIL` / `ADMIN_PASSWORD` (for the first run)
 
+### Vercel (current live site)
+The repository is ready for Vercel. `vercel.json` builds the React site into `client/dist`, sends every `/api/*` request to the Express app through `api/index.js` (a serverless function), and applies the same security headers the Express server uses.
+
+Vercel functions have no permanent disk, so on Vercel:
+- **Database:** `DB_DRIVER=firestore`, with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` taken from a Firebase service-account key.
+- **Product images:** uploaded to **Vercel Blob**. Create a Blob store (Storage tab, or `vercel blob create-store <name> --access public`) and connect it to the project. This adds `BLOB_READ_WRITE_TOKEN`, and the upload code then uses Blob automatically.
+
+Other environment variables (Project → Settings → Environment Variables, or `vercel env add NAME production`):
+- `CLIENT_URL` (the site's https address)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (from the Dashboard webhook endpoint, not from `stripe listen`), `STRIPE_CURRENCY`
+- `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`
+- optional `SMTP_*`, `EMAIL_FROM`, `ORG_NOTIFY_EMAIL`
+
+Deploy with `vercel deploy --prod`, or connect the GitHub repository so that every push to `main` deploys. **Redeploy after changing environment variables**, because running deployments keep the old values.
+
 ### Hosting options
 - **Render / Railway / Fly.io / a VPS (DigitalOcean, Lightsail):**
   - Build command: `npm run install:all && npm run build`
