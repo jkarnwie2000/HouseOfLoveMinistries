@@ -390,7 +390,7 @@ Other environment variables (Project → Settings → Environment Variables, or 
 - `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`
 - optional `SMTP_*`, `EMAIL_FROM`, `ORG_NOTIFY_EMAIL`
 
-Deploy with `vercel deploy --prod`, or connect the GitHub repository so that every push to `main` deploys. **Redeploy after changing environment variables**, because running deployments keep the old values.
+This repository is connected to Vercel: **every push to `main` deploys the live site automatically**, and pushes to other branches get their own preview link. You can still deploy by hand with `vercel deploy --prod`. **Redeploy after changing environment variables** (Vercel → Deployments → ⋯ → Redeploy), because running deployments keep the old values.
 
 ### Hosting options
 - **Render / Railway / Fly.io / a VPS (DigitalOcean, Lightsail):**
