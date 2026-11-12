@@ -1,12 +1,28 @@
 # House of Love International Ministries – Website, Store & Online Giving
 
-A full-stack, mobile-responsive website for **House of Love International Ministries**, an African-owned Christian church. It has three parts:
+**Live site:** https://house-of-love-ministries.vercel.app
 
-1. **Ministry website.** Home, About, Ministries, Events and Contact pages, styled with an elegant African-inspired burgundy and gold design.
-2. **House of Love Store.** A merchandise shop with search, filters, a persistent cart and **real Stripe Checkout**.
-3. **Online giving.** One-time and **monthly recurring** donations through Stripe, kept completely separate from store orders.
+| Home | Store |
+| --- | --- |
+| ![Home page](docs/screenshots/home-hero.jpg) | ![Store](docs/screenshots/store.jpg) |
+| **Give** | **Admin dashboard** |
+| ![Giving page](docs/screenshots/give.jpg) | ![Admin products](docs/screenshots/admin-products.jpg) |
 
-It also includes a **protected admin dashboard** for managing products, categories, orders, donations, events, messages and staff accounts.
+## About this project
+
+House of Love International Ministries is a full-stack website, online store and donation platform built for an African-owned Christian ministry. It brings together everything a growing church needs online: a welcoming public website, a merchandise shop, secure online giving and a private dashboard where church staff manage it all.
+
+The public site introduces the church through Home, About, Ministries, Events and Contact pages. Visitors can explore eight ministries, see upcoming services and events, register for events and add them to their own calendar, and send a message or prayer request through a validated contact form. The design pairs a burgundy, gold and ivory palette with subtle African-inspired patterns, and it adapts smoothly to phones, tablets and desktops.
+
+The House of Love Store sells church apparel, Holy Bibles and Christian gifts. Shoppers can search and filter products, choose sizes and colours, and keep items in a cart that survives page refreshes. Checkout runs through Stripe Checkout. Prices are always recalculated on the server, and an order is only marked paid after Stripe's signed webhook has been verified, with protection against duplicate events and mismatched amounts. No card details are ever stored.
+
+The giving page accepts preset or custom one-time gifts as well as monthly recurring donations through Stripe subscriptions, with options for anonymous giving and choosing where a gift goes. Customers and donors receive branded email receipts, and the church office automatically receives a clearly marked staff copy of every receipt.
+
+Staff sign in to a role-based admin dashboard to manage products and image uploads, categories, orders and fulfilment, donations and monthly gifts, events, messages and staff accounts. New team members can request an account, which an administrator must approve, and each role sees only what it needs. Staff can also resend any receipt and run an email delivery check.
+
+The project is built with React and Vite on the front end and Node.js with Express on the back end, using Firebase Firestore for data, Vercel Blob for product images and Vercel for hosting. It is backed by 53 automated server tests covering pricing, payments, webhooks, receipts, staff accounts and security.
+
+More screenshots, including mobile views, are in [Screenshots](#12-screenshots).
 
 > **Placeholder content:** The church's history, leadership names, address, service times, product photos, prices and events have **not** been invented. They are clearly labelled, editable placeholders. See [Customising content](#7-customising-content).
 
@@ -92,7 +108,7 @@ No TypeScript is used anywhere.
 ## 3. Project structure
 
 ```
-house-of-love-ministries/
+HouseOfLoveMinistries/
 ├── .env.example              ← copy to .env and fill in
 ├── package.json              ← root scripts (dev, build, start, test)
 ├── README.md
@@ -144,7 +160,8 @@ house-of-love-ministries/
 
 ### Step 1 – Install dependencies
 ```bash
-cd house-of-love-ministries
+git clone https://github.com/jkarnwie2000/HouseOfLoveMinistries.git
+cd HouseOfLoveMinistries
 npm run install:all
 ```
 This installs the root, `server/` and `client/` packages.
@@ -409,11 +426,31 @@ Deploy with `vercel deploy --prod`, or connect the GitHub repository so that eve
 
 ## 12. Screenshots
 
-Add screenshots here once real photos and content are in place, for example:
+Captured from the live site. Product images, photos and church details are clearly labelled placeholders until the church supplies real content.
 
-| Home | Store | Give | Admin |
-| --- | --- | --- | --- |
-| `docs/screenshots/home.png` | `docs/screenshots/store.png` | `docs/screenshots/give.png` | `docs/screenshots/admin.png` |
+### Public website
+| Home (full page) | Ministries |
+| --- | --- |
+| [![Home page, full length](docs/screenshots/home.jpg)](docs/screenshots/home.jpg) | ![Ministries](docs/screenshots/ministries.jpg) |
+| **Events** | **Contact** |
+| ![Events with registration](docs/screenshots/events.jpg) | ![Contact form and service schedule](docs/screenshots/contact.jpg) |
+
+### Store and giving
+| Store | Product |
+| --- | --- |
+| ![Store with search and category filters](docs/screenshots/store.jpg) | ![Product page with colours, sizes and quantity](docs/screenshots/product.jpg) |
+| **Give – one-time or monthly** | |
+| ![Donation form](docs/screenshots/give.jpg) | |
+
+### Mobile
+| Home | Store | Give |
+| --- | --- | --- |
+| ![Mobile home](docs/screenshots/mobile-home.jpg) | ![Mobile store](docs/screenshots/mobile-store.jpg) | ![Mobile giving form](docs/screenshots/mobile-give.jpg) |
+
+### Admin
+| Staff sign-in | Products |
+| --- | --- |
+| ![Staff sign-in](docs/screenshots/admin-login.jpg) | ![Admin products](docs/screenshots/admin-products.jpg) |
 
 ---
 
